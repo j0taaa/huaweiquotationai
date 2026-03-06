@@ -1,16 +1,11 @@
-FROM oven/bun:1.2.23 AS base
+FROM node:20-bookworm-slim AS build
 WORKDIR /app
-
-FROM base AS deps
-COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile
-
-FROM deps AS build
+COPY package.json ./
+RUN npm install
 COPY . .
-ENV NEXT_DISABLE_SWC_WORKER=1
-RUN bun run build
+RUN npm run build
 
-FROM base AS runtime
+FROM oven/bun:1.2.23 AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build /app/.next ./.next
