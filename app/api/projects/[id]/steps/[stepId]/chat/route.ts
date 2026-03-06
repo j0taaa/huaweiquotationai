@@ -15,6 +15,11 @@ type ChatRequest = {
   messages: ChatMessage[];
 };
 
+type RunningTool = {
+  name: string;
+  purpose: string;
+};
+
 async function loadIntakeContext(projectId: string, stepId: string) {
   const items = await listStepIntakeItems(projectId, stepId);
   if (items.length === 0) {
@@ -93,6 +98,16 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   const intakeContext = await loadIntakeContext(projectId, stepId);
+  const runningTool = step.tools.find((item) => item.status === "running");
+  const activeTool: RunningTool = runningTool
+    ? {
+        name: runningTool.toolName,
+        purpose: runningTool.purpose,
+      }
+    : {
+        name: "llm-chat-completions",
+        purpose: "Generate the assistant response using the configured LLM provider.",
+      };
   const systemMessage = [
     `You are the agent for step ${step.step_order}: ${step.step_name}.`,
     `Agent profile: ${step.agent_profile}.`,
@@ -114,6 +129,7 @@ export async function POST(request: Request, context: RouteContext) {
       model: result.model,
       provider: result.provider,
       mocked: result.mocked,
+      runningTool: activeTool,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

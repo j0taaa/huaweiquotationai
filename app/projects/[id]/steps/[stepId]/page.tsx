@@ -44,6 +44,7 @@ export default async function StepInspectionPage({ params }: Props) {
   const { id, stepId } = await params;
   const project = demoProjects.find((item) => item.id === id);
   const step = demoSteps.find((item) => item.id === stepId);
+  const runningToolName = step?.tools.find((tool) => tool.status === "running")?.toolName;
   const intakeItems = await listStepIntakeItems(id, stepId);
 
   if (!project || !step) {
@@ -178,7 +179,11 @@ export default async function StepInspectionPage({ params }: Props) {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <StepChatPanel projectId={project.id} stepId={step.id} />
+            <StepChatPanel
+              defaultRunningToolName={runningToolName}
+              projectId={project.id}
+              stepId={step.id}
+            />
           </CardContent>
         </Card>
       </section>
