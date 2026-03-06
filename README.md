@@ -20,6 +20,18 @@ The app runs at `http://localhost:3000`.
 Each step page includes a chat panel that calls the step agent LLM endpoint:
 - `POST /api/projects/:id/steps/:stepId/chat`
 
+## Workspace contract
+Each project has its own folder under `./data/projects/<projectId>`.
+Inside each project, every step has:
+- `./data/projects/<projectId>/<stepId>/input`
+- `./data/projects/<projectId>/<stepId>/output`
+
+Rules:
+- Files uploaded in the web UI are written into step 1 (`stp_001`) `input`.
+- To finish a step and pass its output to the next step input, call:
+  - `POST /api/projects/:id/steps/:stepId/complete`
+- The handoff copies the full current step `output` folder content into the next step `input` folder.
+
 Environment variables:
 - `LLM_API_KEY` (or `OPENAI_API_KEY`) for authentication
 - `LLM_BASE_URL` defaults to `https://api.openai.com/v1`

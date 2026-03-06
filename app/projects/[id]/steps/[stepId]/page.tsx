@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/table";
 import { StepIntakeForm } from "@/components/step-intake-form";
 import { StepChatPanel } from "@/components/step-chat-panel";
+import { StepCompletionPanel } from "@/components/step-completion-panel";
 import { listStepIntakeItems } from "@/lib/intake";
 import { demoProjects, demoSteps } from "@/lib/mock-data";
 import { ensureProjectWorkspace } from "@/lib/workspace";
@@ -114,6 +115,12 @@ export default async function StepInspectionPage({ params }: Props) {
             <p className="text-muted-foreground">
               This is a base observability view. In future iterations it can stream real-time logs and tool outputs.
             </p>
+            <div className="border-t pt-3">
+              <p className="mb-2 text-sm text-muted-foreground">
+                When this step is done, pass its `output` folder content to the next step&apos;s `input`.
+              </p>
+              <StepCompletionPanel projectId={project.id} stepId={step.id} />
+            </div>
           </CardContent>
         </Card>
       </section>
