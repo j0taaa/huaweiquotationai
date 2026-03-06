@@ -17,7 +17,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ProjectFileIntakeForm } from "@/components/project-file-intake-form";
 import { demoProjects, demoQuotations, demoSteps } from "@/lib/mock-data";
+import { ensureProjectWorkspace } from "@/lib/workspace";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -30,6 +32,11 @@ export default async function ProjectPage({ params }: Props) {
   if (!project) {
     notFound();
   }
+
+  ensureProjectWorkspace(
+    project.id,
+    demoSteps.map((item) => item.id),
+  );
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-6xl p-6 md:p-10">
@@ -44,6 +51,20 @@ export default async function ProjectPage({ params }: Props) {
           <Link href="/">Back to dashboard</Link>
         </Button>
       </div>
+
+      <section className="mb-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>Upload source files</CardTitle>
+            <CardDescription>
+              Upload files to be processed by the first step agent (Ingestion & normalization).
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ProjectFileIntakeForm projectId={project.id} />
+          </CardContent>
+        </Card>
+      </section>
 
       <section className="mb-8">
         <Card>

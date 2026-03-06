@@ -16,6 +16,18 @@ bun run dev
 
 The app runs at `http://localhost:3000`.
 
+## Step Chat LLM configuration
+Each step page includes a chat panel that calls the step agent LLM endpoint:
+- `POST /api/projects/:id/steps/:stepId/chat`
+
+Environment variables:
+- `LLM_API_KEY` (or `OPENAI_API_KEY`) for authentication
+- `LLM_BASE_URL` defaults to `https://api.openai.com/v1`
+- `LLM_MODEL` defaults to `gpt-4.1-mini`
+- `LLM_PROVIDER` label shown in UI (default: `openai-compatible`)
+
+If no API key is set, the app runs in a mock echo mode so the chat UI still works.
+
 ## Database
 SQLite file defaults to `./data/app.db` and is auto-created with seed demo data on first run.
 

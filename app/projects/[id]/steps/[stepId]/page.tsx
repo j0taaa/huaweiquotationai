@@ -17,7 +17,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { StepIntakeForm } from "@/components/step-intake-form";
+import { StepChatPanel } from "@/components/step-chat-panel";
+import { listStepIntakeItems } from "@/lib/intake";
 import { demoProjects, demoSteps } from "@/lib/mock-data";
+import { ensureProjectWorkspace } from "@/lib/workspace";
 
 type Props = {
   params: Promise<{ id: string; stepId: string }>;
@@ -39,10 +43,16 @@ export default async function StepInspectionPage({ params }: Props) {
   const { id, stepId } = await params;
   const project = demoProjects.find((item) => item.id === id);
   const step = demoSteps.find((item) => item.id === stepId);
+  const intakeItems = await listStepIntakeItems(id, stepId);
 
   if (!project || !step) {
     notFound();
   }
+
+  ensureProjectWorkspace(
+    project.id,
+    demoSteps.map((item) => item.id),
+  );
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-6xl p-6 md:p-10">
@@ -61,15 +71,16 @@ export default async function StepInspectionPage({ params }: Props) {
       <section className="mb-6 grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Agent configuration</CardTitle>
-            <CardDescription>Snapshot of the agent profile for this stage.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
+          <CardTitle>Agent configuration</CardTitle>
+          <CardDescription>Snapshot of the agent profile for this stage.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
             <p>
               <span className="font-medium">Agent:</span> {step.agent_profile}
             </p>
             <p>
-              <span className="font-medium">Goal:</span> {step.agent_goal}
+              <span className="font-medium">Goal:</span>{" "}
+              {step.agent_goal}
             </p>
             <p>
               <span className="font-medium">Input:</span> {step.input_summary}
@@ -103,6 +114,64 @@ export default async function StepInspectionPage({ params }: Props) {
             <p className="text-muted-foreground">
               This is a base observability view. In future iterations it can stream real-time logs and tool outputs.
             </p>
+          </CardContent>
+        </Card>
+      </section>
+
+      {step.step_order === 1 ? (
+        <section className="mb-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Intake submission</CardTitle>
+              <CardDescription>
+                Send source files and/or free text. Items are stored under project and step input folders.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <StepIntakeForm projectId={project.id} stepId={step.id} />
+
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium">Stored intake items</h3>
+                {intakeItems.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No intake submissions yet.</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Size (bytes)</TableHead>
+                        <TableHead>Created</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {intakeItems.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell>{item.item_type}</TableCell>
+                          <TableCell>{item.original_name ?? item.stored_name}</TableCell>
+                          <TableCell>{item.byte_size}</TableCell>
+                          <TableCell>{item.created_at}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+      ) : null}
+
+      <section className="mb-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Step agent chat</CardTitle>
+            <CardDescription>
+              Chat with this step&apos;s LLM agent to inspect reasoning and outputs before automation is finalized.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <StepChatPanel projectId={project.id} stepId={step.id} />
           </CardContent>
         </Card>
       </section>
