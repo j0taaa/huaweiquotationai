@@ -1,7 +1,6 @@
-import { readFile } from "node:fs/promises";
 import { NextResponse } from "next/server";
 import { getAgentTools, getAvailableAgentToolDefinitions, getStepWorkspaceSummary } from "@/lib/agent-tools";
-import { listStepIntakeItems } from "@/lib/intake";
+import { buildAgentSystemMessage } from "@/lib/agent-prompt";
 import { generateChatCompletion, type ChatMessage } from "@/lib/llm";
 import { demoProjects, demoSteps } from "@/lib/mock-data";
 import { ensureProjectWorkspace } from "@/lib/workspace";
@@ -20,36 +19,6 @@ type RunningTool = {
   name: string;
   purpose: string;
 };
-
-async function loadIntakeContext(projectId: string, stepId: string) {
-  const items = await listStepIntakeItems(projectId, stepId);
-  if (items.length === 0) {
-    return "No intake files submitted yet.";
-  }
-
-  const head = items.slice(0, 8);
-  const lines: string[] = [];
-
-  for (const item of head) {
-    lines.push(
-      `- ${item.original_name ?? item.stored_name} | type=${item.item_type} | mime=${item.mime_type} | bytes=${item.byte_size}`,
-    );
-
-    if (item.mime_type.startsWith("text/")) {
-      try {
-        const content = await readFile(item.storage_path, "utf8");
-        const excerpt = content.replace(/\s+/g, " ").trim().slice(0, 400);
-        if (excerpt.length > 0) {
-          lines.push(`  excerpt: ${excerpt}`);
-        }
-      } catch {
-        lines.push("  excerpt: (unavailable)");
-      }
-    }
-  }
-
-  return `Step intake items:\n${lines.join("\n")}`;
-}
 
 function normalizeMessages(value: unknown): ChatMessage[] {
   if (!Array.isArray(value)) {
@@ -98,7 +67,6 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Provide at least one chat message." }, { status: 400 });
   }
 
-  const intakeContext = await loadIntakeContext(projectId, stepId);
   const runningTool = step.tools.find((item) => item.status === "running");
   const availableTools = getAvailableAgentToolDefinitions(step.step_order);
   const stepWorkspace = getStepWorkspaceSummary(projectId, stepId);
@@ -111,24 +79,12 @@ export async function POST(request: Request, context: RouteContext) {
         name: "llm-chat-completions",
         purpose: "Generate the assistant response using the configured LLM provider.",
       };
-  const systemMessage = [
-    `You are the agent for step ${step.step_order}: ${step.step_name}.`,
-    `Agent profile: ${step.agent_profile}.`,
-    `Goal: ${step.agent_goal}`,
-    `Guidance: ${step.system_prompt_summary}`,
-    "",
-    "Available tools:",
-    ...availableTools.map((tool) => `- ${tool.name}: ${tool.description}`),
-    "",
-    `Repository root: ${process.cwd()}`,
-    `Project workspace: ${stepWorkspace.projectDir}`,
-    `Step workspace: ${stepWorkspace.stepDir}`,
-    `Step input folder: ${stepWorkspace.inputDir}`,
-    `Step output folder: ${stepWorkspace.outputDir}`,
-    "",
-    "When relevant, use the intake context below.",
-    intakeContext,
-  ].join("\n");
+  const systemMessage = buildAgentSystemMessage({
+    step,
+    availableTools,
+    repositoryRoot: process.cwd(),
+    stepWorkspace,
+  });
 
   try {
     const agentTools = getAgentTools({ projectId, step });
