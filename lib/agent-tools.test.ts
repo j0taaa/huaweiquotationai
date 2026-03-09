@@ -64,7 +64,7 @@ describe("agent tools", () => {
     expect(output).toContain("result:\n5");
   });
 
-  test("step 1 file tools can write, read, and list repository files", async () => {
+  test("step 1 file tools can write new files, edit existing files, read, and list repository files", async () => {
     const tools = getAgentTools({ projectId: testProjectId, step: createStep(1) });
     const writeTool = tools.find((tool) => tool.name === "write_file");
     const readTool = tools.find((tool) => tool.name === "read_file");
@@ -76,8 +76,9 @@ describe("agent tools", () => {
 
     const targetPath = "data/tmp-agent-tools/sample.txt";
     await writeTool!.execute({ path: targetPath, content: "hello from tool" });
+    await writeTool!.execute({ path: targetPath, oldText: "from", newText: "via" });
 
-    expect(await readTool!.execute({ path: targetPath })).toBe("hello from tool");
+    expect(await readTool!.execute({ path: targetPath })).toBe("hello via tool");
     expect(await listTool!.execute({ path: "data/tmp-agent-tools" })).toContain("sample.txt");
   });
 

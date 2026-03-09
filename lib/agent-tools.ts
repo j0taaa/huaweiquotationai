@@ -86,6 +86,19 @@ function optionalNumber(input: Record<string, unknown>, key: string) {
   return value;
 }
 
+function optionalBoolean(input: Record<string, unknown>, key: string) {
+  const value = input[key];
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (typeof value !== "boolean") {
+    throw new Error(`Tool input field \"${key}\" must be a boolean when provided.`);
+  }
+
+  return value;
+}
+
 function resolveRepoPath(inputPath: string) {
   const resolvedPath = inputPath.startsWith("/") ? resolve(inputPath) : resolve(REPO_ROOT, inputPath);
   const relativePath = relative(REPO_ROOT, resolvedPath);
@@ -346,7 +359,8 @@ function buildReadFileTool(): AgentToolDefinition {
 function buildWriteFileTool(): AgentToolDefinition {
   return {
     name: "write_file",
-    description: "Write a UTF-8 text file inside the repository workspace, creating parent directories when needed.",
+    description:
+      "Write a UTF-8 text file inside the repository workspace, or edit an existing file by replacing exact text.",
     parameters: {
       type: "object",
       properties: {
@@ -356,10 +370,23 @@ function buildWriteFileTool(): AgentToolDefinition {
         },
         content: {
           type: "string",
-          description: "Full file content to write.",
+          description: "Full file content to write when creating or overwriting a file.",
+        },
+        oldText: {
+          type: "string",
+          description: "Exact text to replace when editing an existing file.",
+        },
+        newText: {
+          type: "string",
+          description: "Replacement text to use with oldText.",
+        },
+        replaceAll: {
+          type: "boolean",
+          description: "Replace every occurrence instead of only the first. Defaults to false.",
         },
       },
-      required: ["path", "content"],
+      required: ["path"],
+      anyOf: [{ required: ["content"] }, { required: ["oldText", "newText"] }],
       additionalProperties: false,
     },
   };
@@ -400,14 +427,37 @@ function buildStepOneFileTools(): AgentToolRuntime[] {
       async execute(input: unknown) {
         const args = requireObject(input);
         const path = requireString(args, "path");
-        const content = args.content;
-        if (typeof content !== "string") {
-          throw new Error("Tool input must include a string field named \"content\".");
-        }
         const resolvedPath = resolveRepoPath(path);
-        await mkdir(dirname(resolvedPath), { recursive: true });
-        await writeFile(resolvedPath, content, "utf8");
-        return `wrote ${Buffer.byteLength(content, "utf8")} bytes to ${formatPathForDisplay(resolvedPath)}`;
+        const content = args.content;
+        const oldText = args.oldText;
+        const newText = args.newText;
+        const replaceAll = optionalBoolean(args, "replaceAll") ?? false;
+
+        if (typeof content === "string") {
+          await mkdir(dirname(resolvedPath), { recursive: true });
+          await writeFile(resolvedPath, content, "utf8");
+          return `wrote ${Buffer.byteLength(content, "utf8")} bytes to ${formatPathForDisplay(resolvedPath)}`;
+        }
+
+        if (typeof oldText !== "string" || oldText.trim().length === 0 || typeof newText !== "string") {
+          throw new Error(
+            "Tool input must include either a string field named \"content\" or string fields named \"oldText\" and \"newText\".",
+          );
+        }
+
+        const originalContent = await readFile(resolvedPath, "utf8");
+
+        if (!originalContent.includes(oldText)) {
+          throw new Error(`Could not find the requested text in ${formatPathForDisplay(resolvedPath)}.`);
+        }
+
+        const updatedContent = replaceAll
+          ? originalContent.split(oldText).join(newText)
+          : originalContent.replace(oldText, newText);
+
+        await writeFile(resolvedPath, updatedContent, "utf8");
+
+        return `edited ${formatPathForDisplay(resolvedPath)}`;
       },
     },
     {
@@ -435,7 +485,12 @@ export function getAvailableAgentToolDefinitions(stepOrder: number): AgentToolDe
   const definitions: AgentToolDefinition[] = [buildEvalTool()];
 
   if (stepOrder === 1) {
-    definitions.push(buildShellToolDefinition(), buildReadFileTool(), buildWriteFileTool(), buildListDirectoryTool());
+    definitions.push(
+      buildShellToolDefinition(),
+      buildReadFileTool(),
+      buildWriteFileTool(),
+      buildListDirectoryTool(),
+    );
   }
 
   return definitions;
