@@ -112,7 +112,15 @@ describe("generateChatCompletion", () => {
 
     expect(result.mocked).toBe(false);
     expect(result.provider).toBe("test-provider");
-    expect(result.toolCalls).toEqual([{ name: "demo_tool" }]);
+    expect(result.toolCalls).toEqual([
+      {
+        id: "call_1",
+        name: "demo_tool",
+        arguments: JSON.stringify({ path: "demo.txt" }),
+        output: "demo file contents",
+        status: "completed",
+      },
+    ]);
     expect(result.content).toBe("Tool call completed successfully.");
     expect(toolInputs).toEqual([{ path: "demo.txt" }]);
 

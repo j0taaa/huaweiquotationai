@@ -7,6 +7,15 @@ import { Textarea } from "@/components/ui/textarea";
 type ChatMessage = {
   role: "user" | "assistant";
   content: string;
+  toolCalls?: ToolCallTrace[];
+};
+
+type ToolCallTrace = {
+  id: string;
+  name: string;
+  arguments: string;
+  output: string;
+  status: "completed" | "failed";
 };
 
 type Props = {
@@ -55,6 +64,7 @@ export function StepChatPanel({ projectId, stepId, defaultRunningToolName }: Pro
             model?: string;
             provider?: string;
             mocked?: boolean;
+            toolCalls?: ToolCallTrace[];
             runningTool?: { name?: string; purpose?: string };
           }
         | null;
@@ -75,7 +85,14 @@ export function StepChatPanel({ projectId, stepId, defaultRunningToolName }: Pro
           purpose: payload.runningTool.purpose ?? "",
         });
       }
-      setMessages((current) => [...current, { role: "assistant", content: payload.reply ?? "" }]);
+      setMessages((current) => [
+        ...current,
+        {
+          role: "assistant",
+          content: payload.reply ?? "",
+          toolCalls: payload.toolCalls ?? [],
+        },
+      ]);
     } catch {
       setError("Network or server error during chat.");
     } finally {
@@ -102,6 +119,23 @@ export function StepChatPanel({ projectId, stepId, defaultRunningToolName }: Pro
             >
               <p className="mb-1 text-xs opacity-70">{message.role === "user" ? "You" : "Agent"}</p>
               <p className="whitespace-pre-wrap">{message.content}</p>
+              {message.role === "assistant" && message.toolCalls && message.toolCalls.length > 0 ? (
+                <div className="mt-3 space-y-2 border-t pt-2">
+                  <p className="text-xs font-medium opacity-80">Tool calls</p>
+                  {message.toolCalls.map((toolCall) => (
+                    <div className="rounded-md border bg-muted/30 p-2 text-xs" key={toolCall.id}>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-medium">{toolCall.name}</span>
+                        <span className="uppercase opacity-70">{toolCall.status}</span>
+                      </div>
+                      <p className="mt-2 opacity-70">Arguments</p>
+                      <pre className="whitespace-pre-wrap break-words">{toolCall.arguments}</pre>
+                      <p className="mt-2 opacity-70">Output</p>
+                      <pre className="whitespace-pre-wrap break-words">{toolCall.output}</pre>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
           ))
         )}

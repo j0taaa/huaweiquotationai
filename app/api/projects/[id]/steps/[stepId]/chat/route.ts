@@ -102,6 +102,7 @@ export async function POST(request: Request, context: RouteContext) {
       model: result.model,
       provider: result.provider,
       mocked: result.mocked,
+      toolCalls: result.toolCalls,
       runningTool: responseTool
         ? {
             name: responseTool.name,

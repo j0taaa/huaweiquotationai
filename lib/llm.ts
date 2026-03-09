@@ -10,6 +10,14 @@ export type ChatTool = {
   execute: (input: unknown) => Promise<string>;
 };
 
+export type ChatToolCallTrace = {
+  id: string;
+  name: string;
+  arguments: string;
+  output: string;
+  status: "completed" | "failed";
+};
+
 type GenerateChatCompletionInput = {
   messages: ChatMessage[];
   tools?: ChatTool[];
@@ -46,7 +54,7 @@ type LlmResponse = {
   model: string;
   provider: string;
   mocked: boolean;
-  toolCalls: Array<{ name: string }>;
+  toolCalls: ChatToolCallTrace[];
 };
 
 function readConfig() {
@@ -86,7 +94,7 @@ export async function generateChatCompletion({
   }
 
   const toolMap = new Map(tools.map((tool) => [tool.name, tool]));
-  const toolCalls: Array<{ name: string }> = [];
+  const toolCalls: ChatToolCallTrace[] = [];
   const conversation: ApiMessage[] = [...messages];
 
   for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -138,17 +146,25 @@ export async function generateChatCompletion({
       for (const toolCall of pendingToolCalls) {
         const tool = toolMap.get(toolCall.function.name);
         let toolOutput = `tool_error:\nUnknown tool \"${toolCall.function.name}\".`;
+        let toolStatus: ChatToolCallTrace["status"] = "failed";
 
         if (tool) {
           try {
             toolOutput = await tool.execute(parseToolArguments(toolCall.function.arguments));
+            toolStatus = "completed";
           } catch (error) {
             const message = error instanceof Error ? error.message : "Unknown tool execution error.";
             toolOutput = `tool_error:\n${message}`;
           }
         }
 
-        toolCalls.push({ name: toolCall.function.name });
+        toolCalls.push({
+          id: toolCall.id,
+          name: toolCall.function.name,
+          arguments: toolCall.function.arguments,
+          output: toolOutput,
+          status: toolStatus,
+        });
         conversation.push({
           role: "tool",
           tool_call_id: toolCall.id,
