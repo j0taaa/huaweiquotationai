@@ -20,6 +20,7 @@ import {
 import { StepIntakeForm } from "@/components/step-intake-form";
 import { StepChatPanel } from "@/components/step-chat-panel";
 import { StepCompletionPanel } from "@/components/step-completion-panel";
+import { getAvailableAgentToolDefinitions } from "@/lib/agent-tools";
 import { listStepIntakeItems } from "@/lib/intake";
 import { demoProjects, demoSteps } from "@/lib/mock-data";
 import { ensureProjectWorkspace } from "@/lib/workspace";
@@ -45,6 +46,7 @@ export default async function StepInspectionPage({ params }: Props) {
   const project = demoProjects.find((item) => item.id === id);
   const step = demoSteps.find((item) => item.id === stepId);
   const runningToolName = step?.tools.find((tool) => tool.status === "running")?.toolName;
+  const availableTools = step ? getAvailableAgentToolDefinitions(step.step_order) : [];
   const intakeItems = await listStepIntakeItems(id, stepId);
 
   if (!project || !step) {
@@ -94,6 +96,10 @@ export default async function StepInspectionPage({ params }: Props) {
               <span className="font-medium">System prompt guidance:</span>{" "}
               {step.system_prompt_summary}
             </p>
+            <p>
+              <span className="font-medium">Available tools:</span>{" "}
+              {availableTools.map((tool) => tool.name).join(", ")}
+            </p>
           </CardContent>
         </Card>
 
@@ -108,7 +114,10 @@ export default async function StepInspectionPage({ params }: Props) {
               <Badge variant="outline">{step.status.replace("_", " ")}</Badge>
             </div>
             <p>
-              <span className="font-medium">Tools registered:</span> {step.tools.length}
+              <span className="font-medium">Tools available:</span> {availableTools.length}
+            </p>
+            <p>
+              <span className="font-medium">Observed tool calls:</span> {step.tools.length}
             </p>
             <p>
               <span className="font-medium">Activity events:</span> {step.activities.length}

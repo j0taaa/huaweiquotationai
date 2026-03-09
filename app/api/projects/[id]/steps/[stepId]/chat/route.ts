@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { NextResponse } from "next/server";
+import { getAgentTools, getAvailableAgentToolDefinitions, getStepWorkspaceSummary } from "@/lib/agent-tools";
 import { listStepIntakeItems } from "@/lib/intake";
 import { generateChatCompletion, type ChatMessage } from "@/lib/llm";
 import { demoProjects, demoSteps } from "@/lib/mock-data";
@@ -99,6 +100,8 @@ export async function POST(request: Request, context: RouteContext) {
 
   const intakeContext = await loadIntakeContext(projectId, stepId);
   const runningTool = step.tools.find((item) => item.status === "running");
+  const availableTools = getAvailableAgentToolDefinitions(step.step_order);
+  const stepWorkspace = getStepWorkspaceSummary(projectId, stepId);
   const activeTool: RunningTool = runningTool
     ? {
         name: runningTool.toolName,
@@ -114,22 +117,41 @@ export async function POST(request: Request, context: RouteContext) {
     `Goal: ${step.agent_goal}`,
     `Guidance: ${step.system_prompt_summary}`,
     "",
+    "Available tools:",
+    ...availableTools.map((tool) => `- ${tool.name}: ${tool.description}`),
+    "",
+    `Repository root: ${process.cwd()}`,
+    `Project workspace: ${stepWorkspace.projectDir}`,
+    `Step workspace: ${stepWorkspace.stepDir}`,
+    `Step input folder: ${stepWorkspace.inputDir}`,
+    `Step output folder: ${stepWorkspace.outputDir}`,
+    "",
     "When relevant, use the intake context below.",
     intakeContext,
   ].join("\n");
 
   try {
-    const result = await generateChatCompletion([
-      { role: "system", content: systemMessage },
-      ...incomingMessages,
-    ]);
+    const agentTools = getAgentTools({ projectId, step });
+    const result = await generateChatCompletion({
+      messages: [{ role: "system", content: systemMessage }, ...incomingMessages],
+      tools: agentTools,
+    });
+    const lastToolCall = result.toolCalls.at(-1);
+    const responseTool = lastToolCall
+      ? availableTools.find((tool) => tool.name === lastToolCall.name)
+      : null;
 
     return NextResponse.json({
       reply: result.content,
       model: result.model,
       provider: result.provider,
       mocked: result.mocked,
-      runningTool: activeTool,
+      runningTool: responseTool
+        ? {
+            name: responseTool.name,
+            purpose: responseTool.description,
+          }
+        : activeTool,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
